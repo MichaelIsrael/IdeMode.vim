@@ -8,6 +8,9 @@ A vim plugin to turn a vim session to an IDE-like mode.
 * A terminal.
 * Starts Tagbar (if available)
 
+# Screeshot
+![screenshot.png](examples/screenshot.png)
+
 # Activating
 The IDE-Mode can be toggled using the command:
 ```vim
