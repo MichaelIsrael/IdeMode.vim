@@ -18,7 +18,7 @@ if !exists("g:IdeMode_shell")
 endif
 if !exists("g:IdeMode_terminal")
   if exists(':term')
-    let g:IdeMode_terminal = "term"
+    let g:IdeMode_terminal = "term ++curwin"
   elseif exists(':Terminal')
     let g:IdeMode_terminal = "Terminal"
   endif
@@ -122,22 +122,46 @@ function! s:updateBufferWin()
   let l:buff_info = getbufinfo(s:BufsListBufname)
   if !empty(l:buff_info)
     let l:buf_wins = l:buff_info[0].windows
-    let l:buf_len = l:buff_info[0].linecount
+    try
+      let l:buf_len = l:buff_info[0].linecount
+    catch /^Vim\%((\a\+)\)\=:E716:/
+      let l:buf_len = -1
+    endtry
 
     let l:buffers = map(getbufinfo({'buflisted':1}), 'get(v:val, "bufnr") . ") " . fnamemodify(get(v:val, "name"), ":p:.")')
     let l:buffers_count = len(l:buffers)
 
     call setbufvar(s:BufsListBufname, "&modifiable", 1)
 
-    call setbufline(s:BufsListBufname, 1, l:buffers)
+    " Update buffer list
+    if exists("*setbufline") && l:buf_len != -1
+      call setbufline(s:BufsListBufname, 1, l:buffers)
 
-    
-    if l:buffers_count < l:buf_len
-      for l in range(l:buffers_count+1, l:buf_len)
-        call setbufline(s:BufsListBufname, l, "")
-      endfor
+      " Delete other lines.
+      if l:buffers_count < l:buf_len
+        for l in range(l:buffers_count+1, l:buf_len)
+          if exists("*deletebufline")
+            call deletebufline(s:BufsListBufname, l, "$")
+          else
+            call setbufline(s:BufsListBufname, l, "")
+          endif
+        endfor
+      endif
+    else
+      " Save current buffer and cursor position
+      let l:current_buffer = bufnr('%')
+      let l:current_postion = getcurpos()
+      " Goto Buffers' buffer
+      execute "buffer" . s:BufsListBufname
+      " delete everything
+      silent %d _
+      " Write buffers.
+      call append('$', l:buffers)
+      " Return to original buffer
+      execute 'buffer' . l:current_buffer
+      " Set the cursor back to its position
+      call setpos('.', l:current_postion)
     endif
-    "call bufdo
 
     call setbufvar(s:BufsListBufname, "&modifiable", 0)
 
@@ -153,9 +177,11 @@ endfunction
 
 
 function! s:createTermWin()
-  exec "botright " .  g:IdeMode_terminal . " " . g:IdeMode_shell
+  "exec "botright " .  g:IdeMode_terminal . " " . g:IdeMode_shell
+  "resize 15
+  botright 15split
+  exec  g:IdeMode_terminal . " " . g:IdeMode_shell
   let win_id = win_getid()
-  resize 15
   "Fix window sizes
   set wfh
   setlocal bufhidden=hide
